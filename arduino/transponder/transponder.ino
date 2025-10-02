@@ -8,8 +8,8 @@
 
 // Team Defines (comment / uncomment as required)
 
-#define TRANSPONDER_IP "10.42.17.210"  // #7 (Berkeley)
-#define COMPUTER_IP "10.42.17.200"
+#define TRANSPONDER_IP "10.42.7.210"  // #7 (Berkeley)
+#define COMPUTER_IP "10.42.7.200"
 
 // #define TRANSPONDER_IP "10.42.8.60"  // #8 (Caltech Racer)
 // #define COMPUTER_IP "10.42.8.4"
