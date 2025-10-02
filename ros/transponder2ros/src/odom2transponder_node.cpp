@@ -1,8 +1,11 @@
 
 // Example node of publishing a transponder message from an odom message
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -101,12 +104,56 @@ private:
         msg.header.frame_id = "map";
 
         msg.car_id = car_id_;
-        msg.lat = lla.latitude;
-        msg.lon = lla.longitude;
-        msg.alt = lla.altitude;
-        msg.heading = yaw_deg;
-        msg.vel = odom_.twist.twist.linear.x;
-        msg.state = car_mode_; 
+        msg.state = car_mode_;
+        msg.heartbeat = heartbeat_++;
+
+        const auto lat_e7 = std::llround(lla.latitude * 1e7);
+        const auto lon_e7 = std::llround(lla.longitude * 1e7);
+        const auto alt_dm = std::llround(lla.altitude * 10.0);
+
+        msg.lat_e7 = static_cast<int32_t>(std::clamp<long long>(
+            lat_e7,
+            static_cast<long long>(std::numeric_limits<int32_t>::min()),
+            static_cast<long long>(std::numeric_limits<int32_t>::max())));
+
+        msg.lon_e7 = static_cast<int32_t>(std::clamp<long long>(
+            lon_e7,
+            static_cast<long long>(std::numeric_limits<int32_t>::min()),
+            static_cast<long long>(std::numeric_limits<int32_t>::max())));
+
+        msg.alt_dm = static_cast<int16_t>(std::clamp<long long>(
+            alt_dm,
+            static_cast<long long>(std::numeric_limits<int16_t>::min()),
+            static_cast<long long>(std::numeric_limits<int16_t>::max())));
+
+        double heading_deg = yaw_deg;
+        if (heading_deg > 180.0)
+        {
+            heading_deg -= 360.0;
+        }
+
+        const auto heading_cdeg = std::llround(heading_deg * 100.0);
+        msg.heading_cdeg = static_cast<int16_t>(std::clamp<long long>(
+            heading_cdeg,
+            static_cast<long long>(std::numeric_limits<int16_t>::min()),
+            static_cast<long long>(std::numeric_limits<int16_t>::max())));
+
+        auto vel_cms = std::llround(odom_.twist.twist.linear.x * 100.0);
+        if (vel_cms < 0)
+        {
+            vel_cms = 0;
+        }
+        msg.vel_cms = static_cast<int16_t>(std::clamp<long long>(
+            vel_cms,
+            static_cast<long long>(std::numeric_limits<int16_t>::min()),
+            static_cast<long long>(std::numeric_limits<int16_t>::max())));
+
+        msg.pass_state = transponder_msgs::msg::Transponder::PASS_STATE_IDLE;
+        msg.pass_sequence = 0;
+        msg.target_car_id = 0;
+        msg.pass_zone_id = 0;
+        msg.yield_speed_cms = 0;
+        msg.request_ttl_ms = 0;
 
         pub_Transponder_->publish(msg);
 
@@ -186,7 +233,7 @@ private:
     nav_msgs::msg::Odometry odom_;
     geographic_msgs::msg::GeoPoint lla0_;
     uint8_t car_mode_ = transponder_msgs::msg::Transponder::STATE_UNKNOWN;
-
+    uint8_t heartbeat_ = 0;
 };
 
 int main(int argc, char *argv[])

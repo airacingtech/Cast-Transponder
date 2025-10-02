@@ -36,8 +36,9 @@ private:
     {
         sensor_msgs::msg::NavSatFix gps_msg;
         gps_msg.header = msg->header;
-        gps_msg.latitude = msg->lat;
-        gps_msg.longitude = msg->lon;
+        gps_msg.latitude = static_cast<double>(msg->lat_e7) / 1e7;
+        gps_msg.longitude = static_cast<double>(msg->lon_e7) / 1e7;
+        gps_msg.altitude = static_cast<double>(msg->alt_dm) / 10.0;
         gps_msg.status.status = sensor_msgs::msg::NavSatStatus::STATUS_FIX; // Assume valid fix
         gps_msg.position_covariance_type = sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_UNKNOWN;
         

@@ -35,11 +35,19 @@ class TransponderDebug : public rclcpp::Node
         msg_.header.frame_id = "map";
 
         msg_.car_id = 8;
-        msg_.lat = msg_.lat + 0.1;
-        msg_.lon = msg_.lon - 0.1;
-        msg_.heading = msg_.heading + 0.03;
-        msg_.vel = msg_.vel + 0.2;
         msg_.state = transponder_msgs::msg::Transponder::STATE_NOMINAL;
+        msg_.heartbeat = static_cast<uint8_t>(msg_.heartbeat + 1);
+        msg_.lat_e7 += 1000000;   // +0.1 deg
+        msg_.lon_e7 -= 1000000;   // -0.1 deg
+        msg_.alt_dm = static_cast<int16_t>(msg_.alt_dm + 1);
+        msg_.heading_cdeg = static_cast<int16_t>(msg_.heading_cdeg + 3);
+        msg_.vel_cms = static_cast<int16_t>(msg_.vel_cms + 20);
+        msg_.pass_state = transponder_msgs::msg::Transponder::PASS_STATE_REQUESTING;
+        msg_.pass_sequence = static_cast<uint8_t>(msg_.pass_sequence + 1);
+        msg_.target_car_id = 12;
+        msg_.pass_zone_id = 1;
+        msg_.yield_speed_cms = static_cast<uint16_t>(msg_.yield_speed_cms + 5);
+        msg_.request_ttl_ms = 1000;
 
         pub_Transponder_->publish(msg_);
     }

@@ -65,12 +65,19 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
     msg.header.frame_id = "map";
 
     msg.car_id = transponder.data.car_id;
-    msg.lat = transponder.data.lat/1e7;
-    msg.lon = transponder.data.lon/1e7;
-    msg.alt = transponder.data.alt/1e3;
-    msg.heading = transponder.data.heading/1e2;
-    msg.vel = transponder.data.vel/1e2;
     msg.state = transponder.data.state;
+    msg.heartbeat = transponder.data.heartbeat;
+    msg.lat_e7 = transponder.data.lat_e7;
+    msg.lon_e7 = transponder.data.lon_e7;
+    msg.alt_dm = transponder.data.alt_dm;
+    msg.heading_cdeg = transponder.data.heading_cdeg;
+    msg.vel_cms = transponder.data.vel_cms;
+    msg.pass_state = transponder.data.pass_state;
+    msg.pass_sequence = transponder.data.pass_sequence;
+    msg.target_car_id = transponder.data.target_car_id;
+    msg.pass_zone_id = transponder.data.pass_zone_id;
+    msg.yield_speed_cms = transponder.data.yield_speed_cms;
+    msg.request_ttl_ms = transponder.data.request_ttl_ms;
 
     pub_Transponder_->publish(msg);
 
@@ -87,8 +94,8 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
     // Debugging
     if (0)
     {
-        RCLCPP_INFO(this->get_logger(), "lat: %8.3d, lon: %8.3d",
-            transponder.data.lat, transponder.data.lon
+        RCLCPP_INFO(this->get_logger(), "lat_e7: %d, lon_e7: %d",
+            transponder.data.lat_e7, transponder.data.lon_e7
         );
     }
 
@@ -105,14 +112,21 @@ void transponder2ros::callback_Transponder(const transponder_msgs::msg::Transpon
     transponder.version = TRANSPONDER_UDP_STRUCT_VERISON;   // Struct version
     transponder.sec = msg->header.stamp.sec;                // UTC time [ s ]
     transponder.nanosec = msg->header.stamp.nanosec;        // UTC time nanoseconds [ ns ]
-    transponder.car_id = msg->car_id;                       // Car ID [ - ]
-    transponder.lat = msg->lat*1e7;                         // Vehicle longitude [ dd.dd x 10^7 ]
-    transponder.lon = msg->lon*1e7;                         // Vehicle latitude [ dd.dd x 10^7 ]
-    transponder.alt = msg->alt*1e3;                         // Vehicle altitude [ mm ]
-    transponder.heading = msg->heading*1e2;                 // Vehicle GPS heading [ cdeg ]
-    transponder.vel = (msg->vel > 0) ? msg->vel*1e2 : 0;    // Vehicle speed, force positive [ cm/s ]
+    transponder.car_id = msg->car_id;                       // Vehicle ID [ - ]
     transponder.state = msg->state;                         // Vehicle state [ - ]
-  
+    transponder.heartbeat = msg->heartbeat;                 // Heartbeat counter [ - ]
+    transponder.lat_e7 = msg->lat_e7;                       // Latitude * 1e7 [ signed deg * 1e7 ]
+    transponder.lon_e7 = msg->lon_e7;                       // Longitude * 1e7 [ signed deg * 1e7 ]
+    transponder.alt_dm = msg->alt_dm;                       // Altitude [ dm ]
+    transponder.heading_cdeg = msg->heading_cdeg;           // Heading [ cdeg ]
+    transponder.vel_cms = (msg->vel_cms > 0) ? msg->vel_cms : 0; // Longitudinal speed [ cm/s ]
+    transponder.pass_state = msg->pass_state;               // Pass FSM state [ enum ]
+    transponder.pass_sequence = msg->pass_sequence;         // Pass handshake monotonic counter
+    transponder.target_car_id = msg->target_car_id;         // Defender car ID [ - ]
+    transponder.pass_zone_id = msg->pass_zone_id;           // Pass zone identifier
+    transponder.yield_speed_cms = msg->yield_speed_cms;     // Defender follow speed [ cm/s ]
+    transponder.request_ttl_ms = msg->request_ttl_ms;       // Request TTL [ ms ]
+
     // Push data
     push_udp(transponder);
 

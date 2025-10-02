@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-const uint8_t TRANSPONDER_UDP_STRUCT_VERISON = 0x04;  // 2025-06-28
+const uint8_t TRANSPONDER_UDP_STRUCT_VERISON = 0x05;  // 2025-07-01
                                                       // Check on the ROS side the versions of the
                                                       // structs you are getting are correct
 
@@ -18,13 +18,20 @@ struct __attribute__((packed)) StructIacTransponder
   uint8_t version;               // Struct version
   int32_t sec;                   // UTC time seconds [ s ]
   uint32_t nanosec;              // UTC time nanoseconds [ ns ]
-  uint8_t car_id;                // Car ID [ - ]
-  int32_t lat;                   // Vehicle longitude [ dd.dd x 10^7 ]
-  int32_t lon;                   // Vehicle latitude [ dd.dd x 10^7 ]
-  int32_t alt;                   // Vehicle altitude [ mm ]
-  uint16_t heading;              // Vehicle GPS heading [ cdeg ]
-  uint16_t vel;                  // Vehicle speed [ cm/s ]
-  uint8_t state;                 // Vehicle state [ - ], see transponder_msgs::msg::Transponder
+  uint8_t car_id;                // Vehicle ID [ - ]
+  uint8_t state;                 // Vehicle state [ - ]
+  uint8_t heartbeat;             // Rolling heartbeat counter [ - ]
+  int32_t lat_e7;                // Latitude * 1e7 [ signed deg * 1e7 ]
+  int32_t lon_e7;                // Longitude * 1e7 [ signed deg * 1e7 ]
+  int16_t alt_dm;                // Altitude in decimeters [ dm ]
+  int16_t heading_cdeg;          // Heading centi-degrees [ deg * 100 ]
+  int16_t vel_cms;               // Longitudinal speed [ cm/s ]
+  uint8_t pass_state;            // Pass FSM state [ enum ]
+  uint8_t pass_sequence;         // Pass handshake monotonic counter
+  uint8_t target_car_id;         // Defender car ID being overtaken [ - ]
+  uint8_t pass_zone_id;          // Authorized straight identifier
+  uint16_t yield_speed_cms;      // Defender follow speed [ cm/s ]
+  uint16_t request_ttl_ms;       // Request TTL relative to header.stamp [ ms ]
 };
 
 union TransponderUdpPacket

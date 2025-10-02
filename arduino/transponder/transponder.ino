@@ -149,12 +149,19 @@ void process_udp()
       sprintf(buf_, "        sec: %d\n"    ,xbee_packet.data.data.data.sec); Serial.print(buf_);
       sprintf(buf_, "    nanosec: %d\n"    ,xbee_packet.data.data.data.nanosec); Serial.print(buf_);
       sprintf(buf_, "        Car: %d\n"    ,xbee_packet.data.data.data.car_id); Serial.print(buf_);
-      sprintf(buf_, "        Lat: %11.5f\n",xbee_packet.data.data.data.lat/1e7); Serial.print(buf_);
-      sprintf(buf_, "        Lon: %11.5f\n",xbee_packet.data.data.data.lon/1e7); Serial.print(buf_);
-      sprintf(buf_, "        Alt: %11.5f\n",xbee_packet.data.data.data.alt/1e3); Serial.print(buf_);
-      sprintf(buf_, "    Heading: %5.2f\n" ,xbee_packet.data.data.data.heading/1e2); Serial.print(buf_);
-      sprintf(buf_, "        Vel: %5.2f\n" ,xbee_packet.data.data.data.vel/1e2); Serial.print(buf_);
       sprintf(buf_, "      State: %d\n"    ,xbee_packet.data.data.data.state); Serial.print(buf_);
+      sprintf(buf_, "  Heartbeat: %d\n" ,xbee_packet.data.data.data.heartbeat); Serial.print(buf_);
+      sprintf(buf_, "        Lat: %11.5f\n",xbee_packet.data.data.data.lat_e7/1e7); Serial.print(buf_);
+      sprintf(buf_, "        Lon: %11.5f\n",xbee_packet.data.data.data.lon_e7/1e7); Serial.print(buf_);
+      sprintf(buf_, "        Alt: %8.3f\n" ,xbee_packet.data.data.data.alt_dm/10.0); Serial.print(buf_);
+      sprintf(buf_, "    Heading: %6.2f\n" ,xbee_packet.data.data.data.heading_cdeg/100.0); Serial.print(buf_);
+      sprintf(buf_, "        Vel: %6.2f\n" ,xbee_packet.data.data.data.vel_cms/100.0); Serial.print(buf_);
+      sprintf(buf_, "  PassState: %d\n",xbee_packet.data.data.data.pass_state); Serial.print(buf_);
+      sprintf(buf_, "  PassSeq : %d\n",xbee_packet.data.data.data.pass_sequence); Serial.print(buf_);
+      sprintf(buf_, " TargetCar: %d\n",xbee_packet.data.data.data.target_car_id); Serial.print(buf_);
+      sprintf(buf_, " PassZone : %d\n",xbee_packet.data.data.data.pass_zone_id); Serial.print(buf_);
+      sprintf(buf_, " YieldVel: %6.2f\n",xbee_packet.data.data.data.yield_speed_cms/100.0); Serial.print(buf_);
+      sprintf(buf_, " RequestTTL: %u ms\n",xbee_packet.data.data.data.request_ttl_ms); Serial.print(buf_);
     }
 
     if (len == SIZEOF_TransponderUdpPacket)
@@ -298,12 +305,19 @@ void xbee_state_machine(char x)
             sprintf(buf_, "        sec: %d\n"    ,data.data.sec); Serial.print(buf_);
             sprintf(buf_, "    nanosec: %d\n"    ,data.data.nanosec); Serial.print(buf_);
             sprintf(buf_, "        Car: %d\n"    ,data.data.car_id); Serial.print(buf_);
-            sprintf(buf_, "        Lat: %13.8f\n",data.data.lat/1e7); Serial.print(buf_);
-            sprintf(buf_, "        Lon: %13.8f\n",data.data.lon/1e7); Serial.print(buf_);
-            sprintf(buf_, "        Alt: %8.3f\n" ,data.data.alt/1e3); Serial.print(buf_);
-            sprintf(buf_, "    Heading: %5.2f\n" ,data.data.heading/1e2); Serial.print(buf_);
-            sprintf(buf_, "        Vel: %5.2f\n" ,data.data.vel/1e2); Serial.print(buf_);
             sprintf(buf_, "      State: %d\n"    ,data.data.state); Serial.print(buf_);
+            sprintf(buf_, "  Heartbeat: %d\n" ,data.data.heartbeat); Serial.print(buf_);
+            sprintf(buf_, "        Lat: %13.8f\n",data.data.lat_e7/1e7); Serial.print(buf_);
+            sprintf(buf_, "        Lon: %13.8f\n",data.data.lon_e7/1e7); Serial.print(buf_);
+            sprintf(buf_, "        Alt: %8.3f\n" ,data.data.alt_dm/10.0); Serial.print(buf_);
+            sprintf(buf_, "    Heading: %6.2f\n" ,data.data.heading_cdeg/100.0); Serial.print(buf_);
+            sprintf(buf_, "        Vel: %6.2f\n" ,data.data.vel_cms/100.0); Serial.print(buf_);
+            sprintf(buf_, "  PassState: %d\n",data.data.pass_state); Serial.print(buf_);
+            sprintf(buf_, "  PassSeq : %d\n",data.data.pass_sequence); Serial.print(buf_);
+            sprintf(buf_, " TargetCar: %d\n",data.data.target_car_id); Serial.print(buf_);
+            sprintf(buf_, " PassZone : %d\n",data.data.pass_zone_id); Serial.print(buf_);
+            sprintf(buf_, " YieldVel: %6.2f\n",data.data.yield_speed_cms/100.0); Serial.print(buf_);
+            sprintf(buf_, " RequestTTL: %u ms\n",data.data.request_ttl_ms); Serial.print(buf_);
             Serial.print("\n");
           }
         } 
@@ -333,12 +347,21 @@ void send_test_udp()
   test_data.data.nanosec = last_udp_nanosec_;
   test_data.data.car_id = 1;
 
-  test_data.data.lat =   362680800 + random(-10, 10);
-  test_data.data.lon = -1150181860 + random(-10, 10);
-  test_data.data.alt =  142000*1e3 + random(-100, 100);
-  test_data.data.heading = random(0,36000);
-  test_data.data.vel = random(0,10000);
   test_data.data.state = 3;
+  test_data.data.heartbeat++;
+
+  test_data.data.lat_e7 =   362680800 + random(-10, 10);
+  test_data.data.lon_e7 = -1150181860 + random(-10, 10);
+  test_data.data.alt_dm = static_cast<int16_t>(1420 + random(-10, 10));  // ~142 m
+  test_data.data.heading_cdeg = static_cast<int16_t>(random(0, 36000));
+  test_data.data.vel_cms = static_cast<int16_t>(random(0, 10000));
+
+  test_data.data.pass_state = (test_data.data.pass_state + 1) % 8;
+  test_data.data.pass_sequence++;
+  test_data.data.target_car_id = 2;
+  test_data.data.pass_zone_id = 1;
+  test_data.data.yield_speed_cms = 2500;  // 25.0 m/s
+  test_data.data.request_ttl_ms = 500;
 
   // Send the packet
   udp.beginPacket(ip_send_, port_);
