@@ -50,7 +50,6 @@ bool transponder2ros::open_serial(int &p_serialPort, std::string device_path)
     }
 
     device_path = std::string(glob_result.gl_pathv[0]);
-    // RCLCPP_INFO(this->get_logger(), "[DEVICE_PATH]: %s", device_path.c_str());
     globfree(&glob_result);
 
     // Open serial port
@@ -68,7 +67,6 @@ bool transponder2ros::open_serial(int &p_serialPort, std::string device_path)
 
     // Set serial attributes
     struct termios tty;
-    // struct termios tty_old;
     memset(&tty, 0, sizeof tty);
 
     if (tcgetattr(p_serialPort, &tty) != 0)
@@ -77,9 +75,6 @@ bool transponder2ros::open_serial(int &p_serialPort, std::string device_path)
         rclcpp::shutdown();
         return false;
     }
-
-    /* Save old tty parameters */
-    // tty_old = tty;
 
     /* Set Baud Rate */
     cfsetospeed(&tty, (speed_t)B57600);
@@ -153,7 +148,7 @@ void transponder2ros::read_serialData()
                 RCLCPP_INFO(this->get_logger(), "Read %2d bytes | %s", n_read, buf);
             }
         }
-        
+
         for (int ii = 0; ii < n_read; ii++)
         {
             parseChar(buf[ii]);
@@ -169,25 +164,26 @@ void transponder2ros::read_serialData()
 bool transponder2ros::parseChar(unsigned char x)
 {
 
-    static uint state = 0;
-    static uint ii = 0;
-    static TransponderUdpPacket data;
+    static uint  state        = 0;
+    static uint  ii           = 0;
+    static uint  expected_len = 0;
+    static char  raw_buf[SIZEOF_MAX_UdpPacket];
 
     // State machine
     switch (state)
     {
     case (0): // Header 1
+        ii = 0;
         if (x == xbee_headerA_)
         {
             state++;
         }
         break;
-    
+
     case (1): // Header 2
         if (x == xbee_headerB_)
         {
             state++;
-            ii = 0;
         }
         else
         {
@@ -195,38 +191,67 @@ bool transponder2ros::parseChar(unsigned char x)
         }
         break;
 
-    case (2): // Store message
+    case (2): // Accumulate first 2 bytes: version + packet_type
 
-        data.raw[ii] = x;
-        ii++;
+        raw_buf[ii++] = x;
 
-        if (ii == SIZEOF_TransponderUdpPacket)
+        if (ii == 2)
         {
-            // RCLCPP_INFO(this->get_logger(), "Data packet received");
+            uint8_t pkt_type = static_cast<uint8_t>(raw_buf[1]);
+
+            if (pkt_type == PACKET_TYPE_POSITION)
+            {
+                expected_len = SIZEOF_PositionUdpPacket;
+                state++;
+            }
+            else if (pkt_type == PACKET_TYPE_COORDINATION)
+            {
+                expected_len = SIZEOF_CoordinationUdpPacket;
+                state++;
+            }
+            else
+            {
+                RCLCPP_WARN(this->get_logger(), "Unknown XBee packet type: 0x%02X", pkt_type);
+                state = 0;
+            }
+        }
+
+        break;
+
+    case (3): // Accumulate remaining bytes
+
+        raw_buf[ii++] = x;
+
+        if (ii == expected_len)
+        {
             state++;
         }
 
         break;
 
-    case (3): // Check checksum
+    case (4): // Check checksum
     {
 
-        // for (size_t i = 0; i < SIZEOF_TransponderUdpPacket; ++i) {
-        //     printf("%02X ", (uint8_t)data.raw[i]);
-        // }
-        // printf("\n");
-
-        uint8_t crc8 = calc_crc8(data.raw, SIZEOF_TransponderUdpPacket);  // Don't include header in checksum
+        uint8_t crc8 = calc_crc8(raw_buf, expected_len);
 
         if (crc8 == x)
         {
-            // Checksum passed, assemble and publish message
-            // RCLCPP_INFO(this->get_logger(), "Checksum passed");
-            publish_Transponder(data);
+            if (expected_len == SIZEOF_PositionUdpPacket)
+            {
+                PositionUdpPacket pos;
+                std::memcpy(pos.raw, raw_buf, SIZEOF_PositionUdpPacket);
+                publish_Transponder(pos);
+            }
+            else if (expected_len == SIZEOF_CoordinationUdpPacket)
+            {
+                CoordinationUdpPacket coord;
+                std::memcpy(coord.raw, raw_buf, SIZEOF_CoordinationUdpPacket);
+                publish_Coordination(coord);
+            }
         }
         else
         {
-            RCLCPP_WARN(this->get_logger(), 
+            RCLCPP_WARN(this->get_logger(),
                 "Checksum failed.  Expected 0x%02X, got 0x%02X",
                 x, crc8
             );
@@ -259,7 +284,7 @@ uint8_t transponder2ros::calc_crc8(const char* data, size_t len)
         {
             if (crc & 0x01)
             {
-                crc = (crc >> 1) ^ 0x8C; 
+                crc = (crc >> 1) ^ 0x8C;
             }
             else
             {

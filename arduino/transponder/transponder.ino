@@ -47,7 +47,7 @@ void WiFiEvent(WiFiEvent_t event)
       break;
 
     case ARDUINO_EVENT_ETH_CONNECTED:
-      // This will happen when the Ethernet cable is plugged 
+      // This will happen when the Ethernet cable is plugged
       Serial.println("ETH Connected");
       break;
 
@@ -69,7 +69,7 @@ void WiFiEvent(WiFiEvent_t event)
       break;
 
     case ARDUINO_EVENT_ETH_DISCONNECTED:
-      // This will happen when the Ethernet cable is unplugged 
+      // This will happen when the Ethernet cable is unplugged
       Serial.println("ETH Disconnected");
       eth_connected = false;
       break;
@@ -93,22 +93,24 @@ void setup()
 
   // Start debugging serial port
   Serial.begin(115200);
-  
+
   Serial.println("=====================");
   Serial.println("IAC Transponder System");
   Serial.println("TRANSPONDER_IP: "+String(TRANSPONDER_IP)+", COMPUTER_IP: "+String(COMPUTER_IP));
-  Serial.println("  Transponder Struct Version: "+String(TRANSPONDER_UDP_STRUCT_VERISON)+", len(XBee Packet): "+String(SIZEOF_XbeePacket)+" bytes");
+  Serial.println("  Transponder Struct Version: "+String(TRANSPONDER_UDP_STRUCT_VERISON)
+    +", len(Position): "+String(SIZEOF_PositionUdpPacket)+" bytes"
+    +", len(Coordination): "+String(SIZEOF_CoordinationUdpPacket)+" bytes");
   Serial.println("=====================");
   Serial.print("Setup...");
 
   // Start Xbee serial port
-  Serial1.begin(57600);
-  
+  Serial1.begin(115200);
+
   // Add a handler for network events. This is misnamed "WiFi" because the ESP32 is historically WiFi only,
   // but in our case, this will react to Ethernet events.
   Serial.print("Registering event handler for ETH events...");
   WiFi.onEvent(WiFiEvent);
-  
+
   // Starth Ethernet (this does NOT start WiFi at the same time)
   Serial.print("Starting ETH interface...");
   ETH.begin();
@@ -131,58 +133,72 @@ void process_udp()
   // Receive UDP and send to Serial1
   int packetSize = udp.parsePacket();
 
-  if (packetSize == SIZEOF_TransponderUdpPacket)
+  if (packetSize == SIZEOF_PositionUdpPacket)
   {
-    // sprintf(buf_,"%8d | UDP packet received (%d bytes)\n",millis(),packetSize); 
-    // Serial.print(buf_);
-
-    XbeePacket xbee_packet;
-
-    // Copy UDP packet into Xbee struct
-    int len = udp.read(xbee_packet.data.data.raw, SIZEOF_TransponderUdpPacket);
+    PositionUdpPacket pos_pkt;
+    int len = udp.read(pos_pkt.raw, SIZEOF_PositionUdpPacket);
 
     // Debugging
     if (print_debug_)
     {
-      Serial.print("\nReceived from UDP / send XBee\n");
-      sprintf(buf_, "    Version: %d\n"    ,xbee_packet.data.data.data.version); Serial.print(buf_);
-      sprintf(buf_, "        sec: %d\n"    ,xbee_packet.data.data.data.sec); Serial.print(buf_);
-      sprintf(buf_, "    nanosec: %d\n"    ,xbee_packet.data.data.data.nanosec); Serial.print(buf_);
-      sprintf(buf_, "        Car: %d\n"    ,xbee_packet.data.data.data.car_id); Serial.print(buf_);
-      sprintf(buf_, "        Lat: %11.5f\n",xbee_packet.data.data.data.lat/1e7); Serial.print(buf_);
-      sprintf(buf_, "        Lon: %11.5f\n",xbee_packet.data.data.data.lon/1e7); Serial.print(buf_);
-      sprintf(buf_, "        Alt: %11.5f\n",xbee_packet.data.data.data.alt/1e3); Serial.print(buf_);
-      sprintf(buf_, "    Heading: %5.2f\n" ,xbee_packet.data.data.data.heading/1e2); Serial.print(buf_);
-      sprintf(buf_, "        Vel: %5.2f\n" ,xbee_packet.data.data.data.vel/1e2); Serial.print(buf_);
-      sprintf(buf_, "      State: %d\n"    ,xbee_packet.data.data.data.state); Serial.print(buf_);
+      Serial.print("\nReceived position from UDP / send XBee\n");
+      sprintf(buf_, "    Version: %d\n"    , pos_pkt.data.version);    Serial.print(buf_);
+      sprintf(buf_, "       Type: 0x%02X\n", pos_pkt.data.packet_type); Serial.print(buf_);
+      sprintf(buf_, "        sec: %d\n"    , pos_pkt.data.sec);         Serial.print(buf_);
+      sprintf(buf_, "    nanosec: %d\n"    , pos_pkt.data.nanosec);     Serial.print(buf_);
+      sprintf(buf_, "        Car: %d\n"    , pos_pkt.data.car_id);      Serial.print(buf_);
+      sprintf(buf_, "      HBeat: %d\n"    , pos_pkt.data.heartbeat);   Serial.print(buf_);
+      sprintf(buf_, "        Lat: %11.5f\n", pos_pkt.data.lat/1e7);     Serial.print(buf_);
+      sprintf(buf_, "        Lon: %11.5f\n", pos_pkt.data.lon/1e7);     Serial.print(buf_);
+      sprintf(buf_, "        Alt: %11.5f\n", pos_pkt.data.alt/1e3);     Serial.print(buf_);
+      sprintf(buf_, "    Heading: %5.2f\n" , pos_pkt.data.heading/1e2); Serial.print(buf_);
+      sprintf(buf_, "        Vel: %5.2f\n" , pos_pkt.data.vel/1e2);     Serial.print(buf_);
+      sprintf(buf_, "      State: %d\n"    , pos_pkt.data.state);       Serial.print(buf_);
     }
 
-    if (len == SIZEOF_TransponderUdpPacket)
+    if (len == SIZEOF_PositionUdpPacket)
     {
-        // Headers
-        xbee_packet.data.headerA = xbee_headerA_;
-        xbee_packet.data.headerB = xbee_headerB_;
+      forward_to_xbee(pos_pkt.raw, SIZEOF_PositionUdpPacket);
 
-        // Calculate checksum for Xbee struct.  Only use the actual struct data as I loose the headers in the decode
-        xbee_packet.data.crc8 = calc_crc8(xbee_packet.data.data.raw, SIZEOF_TransponderUdpPacket);
-
-        // Forward packet out via Serial1
-        Serial1.write((uint8_t*)xbee_packet.raw, SIZEOF_XbeePacket);
-
-        // Store the last UTC time a packet was received
-        last_udp_sec_ = xbee_packet.data.data.data.sec;
-        last_udp_nanosec_ = xbee_packet.data.data.data.nanosec;
+      // Store the last UTC time a position packet was received
+      last_udp_sec_ = pos_pkt.data.sec;
+      last_udp_nanosec_ = pos_pkt.data.nanosec;
     }
     else
     {
-      sprintf(buf_,"Read incorrect number of bytes. Got %d, expected %d\n",len,SIZEOF_TransponderUdpPacket); 
+      sprintf(buf_, "Read incorrect number of bytes. Got %d, expected %d\n", len, SIZEOF_PositionUdpPacket);
+      Serial.print(buf_);
+    }
+  }
+  else if (packetSize == SIZEOF_CoordinationUdpPacket)
+  {
+    CoordinationUdpPacket coord_pkt;
+    int len = udp.read(coord_pkt.raw, SIZEOF_CoordinationUdpPacket);
+
+    // Debugging
+    if (print_debug_)
+    {
+      Serial.print("\nReceived coordination from UDP / send XBee\n");
+      sprintf(buf_, "    Car: %d, PassState: %d, Seq: %d, Target: %d\n",
+        coord_pkt.data.car_id, coord_pkt.data.pass_state,
+        coord_pkt.data.pass_sequence, coord_pkt.data.target_car_id);
+      Serial.print(buf_);
+    }
+
+    if (len == SIZEOF_CoordinationUdpPacket)
+    {
+      forward_to_xbee(coord_pkt.raw, SIZEOF_CoordinationUdpPacket);
+    }
+    else
+    {
+      sprintf(buf_, "Read incorrect number of bytes. Got %d, expected %d\n", len, SIZEOF_CoordinationUdpPacket);
       Serial.print(buf_);
     }
   }
   else if (packetSize)
   {
-
-    sprintf(buf_,"Packet size received incorrect. Got %d, expected %d\n",packetSize,SIZEOF_TransponderUdpPacket); 
+    sprintf(buf_, "Packet size received incorrect. Got %d, expected %d or %d\n",
+      packetSize, SIZEOF_PositionUdpPacket, SIZEOF_CoordinationUdpPacket);
     Serial.print(buf_);
   }
 
@@ -193,7 +209,7 @@ void process_udp()
 
 void process_xbee()
 {
-  
+
   while (Serial1.available())
   {
 
@@ -213,7 +229,7 @@ void process_debug()
   {
     send_test_udp();
     t_last = millis();
-  } 
+  }
 
   if (0)
   {
@@ -224,37 +240,36 @@ void process_debug()
   }
 }
 
+void forward_to_xbee(const char* data, size_t len)
+{
+  // Wrap payload with XBee framing: header ($S) + data + CRC8
+  uint8_t crc8 = calc_crc8(data, len);
+  Serial1.write((uint8_t)xbee_headerA_);
+  Serial1.write((uint8_t)xbee_headerB_);
+  Serial1.write((const uint8_t*)data, len);
+  Serial1.write(crc8);
+}
+
 void xbee_state_machine(char x)
 {
-  if (0)
-  {
-    sprintf(buf_,"0x%02X ",x);
-    Serial.print(buf_);
-  }
-
-  static uint state = 0;
-  static uint ii = 0;
-  static TransponderUdpPacket data;
+  static uint  state        = 0;
+  static uint  ii           = 0;
+  static uint  expected_len = 0;
+  static char  raw_buf[SIZEOF_MAX_UdpPacket];
 
   switch (state)
   {
     case (0) :
       {
-        // Reset variables
+        // Reset variables and wait for first header byte
         ii = 0;
-        // sprintf(buf_,"Looking for headerA : 0x%02X\n",headerA);
-        // Serial.print(buf_);
-
-        // Check for header
         if (x == xbee_headerA_)
           state++;
-      } 
+      }
       break;
+
     case (1) :
       {
-        // sprintf(buf_,"Looking for headerB : 0x%02X\n",headerB);
-        // Serial.print(buf_);
-
         if (x == xbee_headerB_)
         {
           state++;
@@ -265,58 +280,85 @@ void xbee_state_machine(char x)
         }
       }
       break;
+
     case (2) :
       {
+        // Accumulate first 2 bytes: version + packet_type
+        raw_buf[ii++] = x;
 
-        data.raw[ii] = x;
-        ii++;
+        if (ii == 2)
+        {
+          uint8_t pkt_type = (uint8_t)raw_buf[1];
 
-        if (ii == SIZEOF_TransponderUdpPacket)
-          state++;
-
+          if (pkt_type == PACKET_TYPE_POSITION)
+          {
+            expected_len = SIZEOF_PositionUdpPacket;
+            state++;
+          }
+          else if (pkt_type == PACKET_TYPE_COORDINATION)
+          {
+            expected_len = SIZEOF_CoordinationUdpPacket;
+            state++;
+          }
+          else
+          {
+            sprintf(buf_, "Unknown XBee packet type: 0x%02X\n", pkt_type);
+            Serial.print(buf_);
+            state = 0;
+          }
+        }
       }
       break;
+
     case (3) :
       {
-        // Serial.print("Checking checksum\n");
-        uint8_t crc8 = calc_crc8(data.raw, SIZEOF_TransponderUdpPacket);  // Don't include header in checksum
-        
+        // Accumulate remaining bytes until we reach expected_len
+        raw_buf[ii++] = x;
+
+        if (ii == expected_len)
+          state++;
+      }
+      break;
+
+    case (4) :
+      {
+        // Check CRC, then forward via UDP
+        uint8_t crc8 = calc_crc8(raw_buf, expected_len);
+
         if (x == crc8)
         {
-          // Data good, send via UDP
-          // Serial.print("Sending UDP packet\n");
-
           udp.beginPacket(ip_send_, port_);
-          udp.write((uint8_t*)data.raw, SIZEOF_TransponderUdpPacket);
+          udp.write((uint8_t*)raw_buf, expected_len);
           udp.endPacket();
 
-          // Debugging
-          if (print_debug_)
+          // Debugging: print position fields if enabled
+          if (print_debug_ && expected_len == SIZEOF_PositionUdpPacket)
           {
-            Serial.print("\nReceived from XBee / Send UDP\n");
-            sprintf(buf_, "    Version: %d\n"    ,data.data.version); Serial.print(buf_);
-            sprintf(buf_, "        sec: %d\n"    ,data.data.sec); Serial.print(buf_);
-            sprintf(buf_, "    nanosec: %d\n"    ,data.data.nanosec); Serial.print(buf_);
-            sprintf(buf_, "        Car: %d\n"    ,data.data.car_id); Serial.print(buf_);
-            sprintf(buf_, "        Lat: %13.8f\n",data.data.lat/1e7); Serial.print(buf_);
-            sprintf(buf_, "        Lon: %13.8f\n",data.data.lon/1e7); Serial.print(buf_);
-            sprintf(buf_, "        Alt: %8.3f\n" ,data.data.alt/1e3); Serial.print(buf_);
-            sprintf(buf_, "    Heading: %5.2f\n" ,data.data.heading/1e2); Serial.print(buf_);
-            sprintf(buf_, "        Vel: %5.2f\n" ,data.data.vel/1e2); Serial.print(buf_);
-            sprintf(buf_, "      State: %d\n"    ,data.data.state); Serial.print(buf_);
+            StructAVLTPosition* pos = (StructAVLTPosition*)raw_buf;
+            Serial.print("\nReceived position from XBee / Send UDP\n");
+            sprintf(buf_, "    Version: %d\n"    , pos->version);        Serial.print(buf_);
+            sprintf(buf_, "        sec: %d\n"    , pos->sec);             Serial.print(buf_);
+            sprintf(buf_, "    nanosec: %d\n"    , pos->nanosec);         Serial.print(buf_);
+            sprintf(buf_, "        Car: %d\n"    , pos->car_id);          Serial.print(buf_);
+            sprintf(buf_, "      HBeat: %d\n"    , pos->heartbeat);       Serial.print(buf_);
+            sprintf(buf_, "        Lat: %13.8f\n", pos->lat/1e7);         Serial.print(buf_);
+            sprintf(buf_, "        Lon: %13.8f\n", pos->lon/1e7);         Serial.print(buf_);
+            sprintf(buf_, "        Alt: %8.3f\n" , pos->alt/1e3);         Serial.print(buf_);
+            sprintf(buf_, "    Heading: %5.2f\n" , pos->heading/1e2);     Serial.print(buf_);
+            sprintf(buf_, "        Vel: %5.2f\n" , pos->vel/1e2);         Serial.print(buf_);
+            sprintf(buf_, "      State: %d\n"    , pos->state);           Serial.print(buf_);
             Serial.print("\n");
           }
-        } 
+        }
         else
         {
-          sprintf(buf_, "Checksum error.  Expected 0x%02X, got 0x%02X\n",crc8,x);
+          sprintf(buf_, "Checksum error.  Expected 0x%02X, got 0x%02X\n", crc8, x);
           Serial.print(buf_);
           Serial.println("  If this happens every frame, check the packet versions match");
         }
 
         // Reset state machine
         state = 0;
-
       }
       break;
   }
@@ -325,24 +367,26 @@ void xbee_state_machine(char x)
 void send_test_udp()
 {
 
-  static TransponderUdpPacket test_data;
+  static PositionUdpPacket test_data;
 
-  // Fill the packet with some random stuff
-  test_data.data.version = TRANSPONDER_UDP_STRUCT_VERISON;
-  test_data.data.sec = last_udp_sec_;
-  test_data.data.nanosec = last_udp_nanosec_;
-  test_data.data.car_id = 1;
+  // Fill the packet with some random position data
+  test_data.data.version    = TRANSPONDER_UDP_STRUCT_VERISON;
+  test_data.data.packet_type = PACKET_TYPE_POSITION;
+  test_data.data.sec        = last_udp_sec_;
+  test_data.data.nanosec    = last_udp_nanosec_;
+  test_data.data.car_id     = 1;
+  test_data.data.heartbeat  = 0;
 
-  test_data.data.lat =   362680800 + random(-10, 10);
-  test_data.data.lon = -1150181860 + random(-10, 10);
-  test_data.data.alt =  142000*1e3 + random(-100, 100);
-  test_data.data.heading = random(0,36000);
-  test_data.data.vel = random(0,10000);
-  test_data.data.state = 3;
+  test_data.data.lat     =   362680800 + random(-10, 10);
+  test_data.data.lon     = -1150181860 + random(-10, 10);
+  test_data.data.alt     =  142000*1e3 + random(-100, 100);
+  test_data.data.heading = random(0, 36000);
+  test_data.data.vel     = random(0, 10000);
+  test_data.data.state   = 3;
 
   // Send the packet
   udp.beginPacket(ip_send_, port_);
-  udp.write((uint8_t*)test_data.raw, SIZEOF_TransponderUdpPacket);
+  udp.write((uint8_t*)test_data.raw, SIZEOF_PositionUdpPacket);
   udp.endPacket();
 
 }
@@ -363,7 +407,7 @@ uint8_t calc_crc8(const char* data, size_t len)
         {
             if (crc & 0x01)
             {
-                crc = (crc >> 1) ^ 0x8C; 
+                crc = (crc >> 1) ^ 0x8C;
             }
             else
             {

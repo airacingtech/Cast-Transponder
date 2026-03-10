@@ -3,6 +3,7 @@
 std_msgs/Header header  # Standard ROS header
 
 uint8   car_id          # Car ID [ - ]
+uint8   heartbeat       # Rolling heartbeat counter; drop rate exposes link quality [ - ]
 float64 lat             # Vehicle longitude, centre of rear axle [ dd.dd ]
 float64 lon             # Vehicle latitude, centre of rear axle [ dd.dd ]
 float32 alt             # Vehicle altitude (ellipsoid), centre of rear axle [ m ]

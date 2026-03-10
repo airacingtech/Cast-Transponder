@@ -11,7 +11,7 @@ void transponder2ros::init_udp()
 
     std::string param_ip_address = this->get_parameter("transponder_ip").as_string();
     uint16_t param_port = this->get_parameter("udp_port").as_int();
-    
+
     t_Udp_timeout_ = this->get_parameter("timeout").as_double();
     t_Udp_maxAge_ = this->get_parameter("max_age").as_double();
 
@@ -60,15 +60,15 @@ void transponder2ros::init_udp()
     return;
 }
 
-void transponder2ros::push_udp(StructIacTransponder data)
+void transponder2ros::push_udp(StructAVLTPosition data)
 {
     // Convert data to a packet
-    TransponderUdpPacket udp_packet;
+    PositionUdpPacket udp_packet;
     udp_packet.data = data;
 
     // Send data
     ssize_t sent_bytes = sendto(
-        sockfd_, udp_packet.raw, SIZEOF_TransponderUdpPacket, 0,
+        sockfd_, udp_packet.raw, SIZEOF_PositionUdpPacket, 0,
          (sockaddr*)&send_addr_, sizeof(send_addr_)
     );
 
@@ -76,20 +76,26 @@ void transponder2ros::push_udp(StructIacTransponder data)
     {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1UL * 1000 * 1000, "Failed to send transponder UDP packet");
     }
-    else
-    {
-        if (0)
-        {
-            RCLCPP_INFO(this->get_logger(), "Sent %ld bytes", sent_bytes);
-            RCLCPP_INFO(this->get_logger(), "Time %d", udp_packet.data.nanosec);
-        }
-    }
 
-    // Debugging
-    if (0)
+    // All done
+    return;
+}
+
+void transponder2ros::push_udp_coordination(StructAVLTCoordination data)
+{
+    // Convert data to a packet
+    CoordinationUdpPacket udp_packet;
+    udp_packet.data = data;
+
+    // Send data
+    ssize_t sent_bytes = sendto(
+        sockfd_, udp_packet.raw, SIZEOF_CoordinationUdpPacket, 0,
+        (sockaddr*)&send_addr_, sizeof(send_addr_)
+    );
+
+    if (sent_bytes < 0)
     {
-        RCLCPP_INFO(this->get_logger(), "Sending %5.2d, %5.2d, %5.2d",
-        udp_packet.data.lat, udp_packet.data.lon, udp_packet.data.vel);
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1UL * 1000 * 1000, "Failed to send coordination UDP packet");
     }
 
     // All done
@@ -105,17 +111,17 @@ void transponder2ros::read_udpData()
         // Get available data
         ssize_t len = recvfrom(sockfd_, buffer_, sizeof(buffer_) - 1, 0, (struct sockaddr *)&read_addr_, &addr_len_);
 
-        if (len == SIZEOF_TransponderUdpPacket)
+        if (len == SIZEOF_PositionUdpPacket)
         {
-            // RCLCPP_INFO(this->get_logger(), "Got %ld bytes", len);
-
-            TransponderUdpPacket transponder;
-
-            std::memcpy(&transponder.data, &buffer_, SIZEOF_TransponderUdpPacket);
-
-            // Publish transponder packet
+            PositionUdpPacket transponder;
+            std::memcpy(&transponder.data, &buffer_, SIZEOF_PositionUdpPacket);
             publish_Transponder(transponder);
-
+        }
+        else if (len == SIZEOF_CoordinationUdpPacket)
+        {
+            CoordinationUdpPacket coord;
+            std::memcpy(&coord.data, &buffer_, SIZEOF_CoordinationUdpPacket);
+            publish_Coordination(coord);
         }
     }
 

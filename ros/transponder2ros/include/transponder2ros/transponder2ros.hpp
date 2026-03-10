@@ -26,6 +26,7 @@
 
 #include "std_msgs/msg/string.hpp"
 #include "transponder_msgs/msg/transponder.hpp"
+#include "transponder_msgs/msg/avlt_coordination.hpp"
 
 #include "iac_udp_struct.h"
 
@@ -39,8 +40,10 @@ private:
 
     // Subscribers / Publishers / Timers
     rclcpp::Subscription<transponder_msgs::msg::Transponder>::SharedPtr sub_Transponder_;
+    rclcpp::Subscription<transponder_msgs::msg::AVLTCoordination>::SharedPtr sub_Coordination_;
 
     rclcpp::Publisher<transponder_msgs::msg::Transponder>::SharedPtr pub_Transponder_;
+    rclcpp::Publisher<transponder_msgs::msg::AVLTCoordination>::SharedPtr pub_Coordination_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_Version_;
 
     rclcpp::TimerBase::SharedPtr timer_1Hz_, timer_10s_;
@@ -74,7 +77,8 @@ private:
     void init_ros();
     void init_serial();
 
-    void push_udp(StructIacTransponder data);
+    void push_udp(StructAVLTPosition data);
+    void push_udp_coordination(StructAVLTCoordination data);
     void read_udpData();
 
     bool open_serial(int &p_serialPort, std::string device_path);
@@ -83,9 +87,12 @@ private:
     uint8_t calc_crc8(const char* data, size_t len);
 
     void callback_Transponder(const transponder_msgs::msg::Transponder::SharedPtr msg);
-    void publish_Transponder(TransponderUdpPacket transponder);
+    void publish_Transponder(PositionUdpPacket transponder);
+
+    void callback_Coordination(const transponder_msgs::msg::AVLTCoordination::SharedPtr msg);
+    void publish_Coordination(CoordinationUdpPacket coord);
 
     void callback_1Hz();
     void callback_10s();
-  
+
 };
