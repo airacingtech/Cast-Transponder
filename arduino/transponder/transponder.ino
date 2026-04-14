@@ -14,6 +14,12 @@
 // #define TRANSPONDER_IP "10.42.8.60"  // #8 (Caltech Racer)
 // #define COMPUTER_IP "10.42.8.4"
 
+// #define TRANSPONDER_IP "10.42.9.1"  // #9 (UV)
+// #define COMPUTER_IP "10.42.9.60"
+
+// #define TRANSPONDER_IP "10.42.10.X"  // #10 (IU)
+// #define COMPUTER_IP "10.42.10.Y"
+
 // IP settings
 IPAddress local_IP(TRANSPONDER_IP);        // IP Address of the Transponder
 IPAddress ip_send_(COMPUTER_IP);           // Destination IP for UDP messages (ROS2 computer)
@@ -102,7 +108,7 @@ void setup()
   Serial.print("Setup...");
 
   // Start Xbee serial port
-  Serial1.begin(57600);
+  Serial1.begin(115200);
   
   // Add a handler for network events. This is misnamed "WiFi" because the ESP32 is historically WiFi only,
   // but in our case, this will react to Ethernet events.
