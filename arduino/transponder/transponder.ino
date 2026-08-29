@@ -12,7 +12,7 @@
 // #define COMPUTER_IP "10.42.17.200"
 
 // #define TRANSPONDER_IP "10.42.22.60"  // #2 (Purdue)
-// #define COMPUTER_IP "10.42.10.Y"
+// #define COMPUTER_IP "10.42.22.1"
 
 // #define TRANSPONDER_IP "10.42.8.60"  // #8 (Caltech Racer)
 // #define COMPUTER_IP "10.42.8.4"
