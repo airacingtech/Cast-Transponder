@@ -8,8 +8,11 @@
 
 // Team Defines (comment / uncomment as required)
 
-#define TRANSPONDER_IP "10.42.17.210"  // #7 (Berkeley)
-#define COMPUTER_IP "10.42.17.200"
+// #define TRANSPONDER_IP "10.42.17.210"  // #7 (Berkeley)
+// #define COMPUTER_IP "10.42.17.200"
+
+// #define TRANSPONDER_IP "10.42.22.60"  // #2 (Purdue)
+// #define COMPUTER_IP "10.42.22.1"
 
 // #define TRANSPONDER_IP "10.42.8.60"  // #8 (Caltech Racer)
 // #define COMPUTER_IP "10.42.8.4"
@@ -17,8 +20,11 @@
 // #define TRANSPONDER_IP "10.42.9.1"  // #9 (UV)
 // #define COMPUTER_IP "10.42.9.60"
 
-// #define TRANSPONDER_IP "10.42.10.X"  // #10 (IU)
-// #define COMPUTER_IP "10.42.10.Y"
+// #define TRANSPONDER_IP "10.42.10.211"  // #10 (IU)
+// #define COMPUTER_IP "10.42.10.100"
+
+// #define TRANSPONDER_IP "10.42.2.56"  // #34 (Auburn)
+// #define COMPUTER_IP "10.42.2.100"
 
 // IP settings
 IPAddress local_IP(TRANSPONDER_IP);        // IP Address of the Transponder
