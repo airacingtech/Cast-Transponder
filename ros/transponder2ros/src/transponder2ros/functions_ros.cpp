@@ -6,14 +6,17 @@ void transponder2ros::init_ros()
     this->declare_parameter("transponder_in", "/transponder/in");
     this->declare_parameter("transponder_out", "/transponder/out");
     this->declare_parameter("version_out", "/transponder/version");
+    this->declare_parameter("link_status_out", "/transponder/link_status");
 
     std::string param_transponderIn = this->get_parameter("transponder_in").as_string();
     std::string param_transponderOut = this->get_parameter("transponder_out").as_string();
     std::string param_versionOut = this->get_parameter("version_out").as_string();
+    std::string param_linkStatusOut = this->get_parameter("link_status_out").as_string();
 
     // Publishers
     pub_Transponder_ = this->create_publisher<transponder_msgs::msg::Transponder>(param_transponderIn, 1);
     pub_Version_ = this->create_publisher<std_msgs::msg::String>(param_versionOut, 10);
+    pub_LinkStatus_ = this->create_publisher<std_msgs::msg::Bool>(param_linkStatusOut, 10);
 
     // Subscribers
     sub_Transponder_ = this->create_subscription<transponder_msgs::msg::Transponder>(
@@ -42,6 +45,24 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
             "Version mismatch | car: %d, ours: 0x%02X, theirs: 0x%02X",
             transponder.data.car_id, TRANSPONDER_UDP_STRUCT_VERISON, transponder.data.version
         );
+    }
+
+    // Update our last received time and reconnect status for every packet, including heartbeats.
+    // A heartbeat proves the local Ethernet link, the transponder unit, and its firmware loop are
+    // all alive even when nothing has been heard over the XBee radio -- that's what distinguishes
+    // "no vehicle detected" from "we can't detect the transponder at all."
+    t_last_packet_ = this->get_clock()->now();
+    if (has_timeout_)
+    {
+        RCLCPP_INFO(this->get_logger(), "Transponder connected");
+        has_timeout_ = false;
+        publish_link_status();
+    }
+
+    // Heartbeat packets carry no vehicle data -- they exist only to prove the link is alive.
+    if (transponder.data.car_id == HEARTBEAT_CAR_ID)
+    {
+        return;
     }
 
     // Reject if message is too old
@@ -73,16 +94,6 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
     msg.state = transponder.data.state;
 
     pub_Transponder_->publish(msg);
-
-    // Update our last received time
-    t_last_packet_ = this->get_clock()->now();
-
-    // Update user if reconnected
-    if (has_timeout_)
-    {
-        RCLCPP_INFO(this->get_logger(), "Transponder connected");
-        has_timeout_ = false;
-    }
 
     // Debugging
     if (0)
@@ -120,6 +131,13 @@ void transponder2ros::callback_Transponder(const transponder_msgs::msg::Transpon
     return;
 }
 
+void transponder2ros::publish_link_status()
+{
+    std_msgs::msg::Bool msg;
+    msg.data = !has_timeout_;
+    pub_LinkStatus_->publish(msg);
+}
+
 void transponder2ros::callback_1Hz()
 {
 
@@ -137,6 +155,8 @@ void transponder2ros::callback_1Hz()
     {
         notified_timeout_silence = false;
     }
+
+    publish_link_status();
 
     // Print message for up to 30 s
     if (has_timeout_ && t_since_last_msg.seconds() < 30.0)

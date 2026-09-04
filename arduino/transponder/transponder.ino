@@ -134,6 +134,7 @@ void loop()
 
   process_udp();
   process_xbee();
+  process_heartbeat();
   // process_debug();  // Code for sending debug packets
 
 }
@@ -214,6 +215,40 @@ void process_xbee()
 
   }
 
+}
+
+void process_heartbeat()
+{
+  // Sent regardless of what (if anything) has come in over XBee, so the ROS side can tell a
+  // quiet radio channel apart from this transponder itself being unreachable.
+  static unsigned long t_last = 0;
+  const unsigned long heartbeat_period_ms = 1000;
+
+  if (millis() - t_last >= heartbeat_period_ms)
+  {
+    send_heartbeat_udp();
+    t_last = millis();
+  }
+}
+
+void send_heartbeat_udp()
+{
+  TransponderUdpPacket heartbeat;
+
+  heartbeat.data.version = TRANSPONDER_UDP_STRUCT_VERISON;
+  heartbeat.data.sec = last_udp_sec_;
+  heartbeat.data.nanosec = last_udp_nanosec_;
+  heartbeat.data.car_id = HEARTBEAT_CAR_ID;
+  heartbeat.data.lat = 0;
+  heartbeat.data.lon = 0;
+  heartbeat.data.alt = 0;
+  heartbeat.data.heading = 0;
+  heartbeat.data.vel = 0;
+  heartbeat.data.state = 0;
+
+  udp.beginPacket(ip_send_, port_);
+  udp.write((uint8_t*)heartbeat.raw, SIZEOF_TransponderUdpPacket);
+  udp.endPacket();
 }
 
 void process_debug()

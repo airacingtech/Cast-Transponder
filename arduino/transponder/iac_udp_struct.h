@@ -13,6 +13,12 @@ const uint8_t TRANSPONDER_UDP_STRUCT_VERISON = 0x04;  // 2025-06-28
 const char xbee_headerA_ = '$';
 const char xbee_headerB_ = 'S';
 
+// car_id sentinel for a local liveness heartbeat -- proves the transponder's Ethernet link and
+// firmware loop are alive even when nothing has been heard over the XBee radio. Matches
+// race_msgs::msg::VehicleId::UNKNOWN (0), which is already reserved as "no car" -- no real
+// competitor is ever numbered 0, so this is not a new allocation, just reusing the existing one.
+const uint8_t HEARTBEAT_CAR_ID = 0;
+
 struct __attribute__((packed)) StructIacTransponder
 {
   uint8_t version;               // Struct version

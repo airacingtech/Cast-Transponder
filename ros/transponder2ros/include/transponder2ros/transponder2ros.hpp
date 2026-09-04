@@ -24,6 +24,7 @@
 #include <string>
 #include <glob.h>
 
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "transponder_msgs/msg/transponder.hpp"
 
@@ -42,6 +43,7 @@ private:
 
     rclcpp::Publisher<transponder_msgs::msg::Transponder>::SharedPtr pub_Transponder_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_Version_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_LinkStatus_;
 
     rclcpp::TimerBase::SharedPtr timer_1Hz_, timer_10s_;
     rclcpp::TimerBase::SharedPtr timer_readSerial_;
@@ -84,6 +86,7 @@ private:
 
     void callback_Transponder(const transponder_msgs::msg::Transponder::SharedPtr msg);
     void publish_Transponder(TransponderUdpPacket transponder);
+    void publish_link_status();
 
     void callback_1Hz();
     void callback_10s();
