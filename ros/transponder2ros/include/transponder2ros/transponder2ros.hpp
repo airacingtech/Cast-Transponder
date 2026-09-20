@@ -68,10 +68,14 @@ private:
     double t_Udp_maxAge_;     // Max age of UDP packets to accept
     double t_Udp_timeout_;    // Timeout before warning user of no data from other cars
     double t_Link_timeout_;   // Silence from the unit itself before the link counts as lost
-    // Starts lost: nothing has been heard yet, and a consumer gates the rival feed on this, so
-    // claiming a working link before the first packet is the one answer that is never safe.
+    // Not derived from t_last_packet_, which is seeded at construction and so cannot tell "nothing
+    // has ever arrived" from "a packet arrived the instant we started". A consumer gates the rival
+    // feed on the link status, and claiming a working link before the first packet is the one
+    // answer that is never safe, so the never-heard-anything case gets its own flag.
+    bool packet_ever_received_ = false;
     bool link_lost_ = true;
     bool no_car_data_ = false;
+    bool notified_timeout_silence_ = false;
 
     int sockfd_ = socket(AF_INET,SOCK_DGRAM,0);
     int m_serialPort_ = 0;
