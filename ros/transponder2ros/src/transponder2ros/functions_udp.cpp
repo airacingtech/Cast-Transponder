@@ -122,7 +122,7 @@ void transponder2ros::read_udpData()
             std::memcpy(&transponder.data, &buffer_, SIZEOF_TransponderUdpPacket);
 
             // Publish transponder packet
-            publish_Transponder(transponder);
+            publish_Transponder(transponder, PacketSource::kTransponderUdp);
 
         }
     }

@@ -39,7 +39,7 @@ void transponder2ros::init_ros()
 
 }
 
-void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
+void transponder2ros::publish_Transponder(TransponderUdpPacket transponder, PacketSource source)
 {
 
     // Reject if the versions don't match
@@ -51,21 +51,27 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
         );
     }
 
-    // Any packet, heartbeat included, proves the local Ethernet link, the transponder unit and its
-    // firmware loop are alive even when nothing has been heard over the XBee radio -- that's what
-    // distinguishes "no vehicle detected" from "we can't detect the transponder at all."
-    bool announce_connected = false;
+    // A UDP packet, heartbeat included, proves the Ethernet link, the transponder unit and its
+    // firmware loop are alive even when nothing has been heard over the XBee radio -- that is what
+    // distinguishes "no vehicle detected" from "we cannot detect the transponder at all". Only the
+    // box can vouch for that. A frame off the serial radio tap is real car data and is published
+    // below like any other, but it reaches this host without passing through the transponder, so
+    // it must never move the link clock.
+    if (source == PacketSource::kTransponderUdp)
     {
-        std::lock_guard<std::mutex> guard(lock_);
-        t_last_packet_ = this->get_clock()->now();
-        packet_ever_received_ = true;
-        announce_connected = link_lost_;
-        link_lost_ = false;
-    }
-    if (announce_connected)
-    {
-        RCLCPP_INFO(this->get_logger(), "Transponder connected");
-        publish_link_status();
+        bool announce_connected = false;
+        {
+            std::lock_guard<std::mutex> guard(lock_);
+            t_last_packet_ = this->get_clock()->now();
+            packet_ever_received_ = true;
+            announce_connected = link_lost_;
+            link_lost_ = false;
+        }
+        if (announce_connected)
+        {
+            RCLCPP_INFO(this->get_logger(), "Transponder connected");
+            publish_link_status();
+        }
     }
 
     // Heartbeat packets carry no vehicle data -- they exist only to prove the link is alive.
@@ -94,7 +100,6 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
     {
         std::lock_guard<std::mutex> guard(lock_);
         t_last_car_packet_ = this->get_clock()->now();
-        no_car_data_ = false;
         notified_timeout_silence_ = false;
     }
 
@@ -197,7 +202,7 @@ void transponder2ros::callback_1Hz()
 
     if (warn_no_car_data)
     {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5UL * 1000 * 1000,
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
             "No transponder data from other cars in %.1f s", since_last_car_s
         );
     }

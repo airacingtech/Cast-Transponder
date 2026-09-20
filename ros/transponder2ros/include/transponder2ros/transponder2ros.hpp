@@ -66,9 +66,12 @@ private:
     // broadcasting" are different faults with different deadlines and different audiences --
     // link_lost_ gates the published link status, no_car_data_ only drives an operator warning.
     //
-    // Everything from here to notified_timeout_silence_ is written by the UDP listener thread and
-    // by the executor, so it is guarded by lock_. The timestamps are the reason a mutex is needed
-    // rather than atomics: rclcpp::Time is 16 bytes and a torn read yields a nonsense age.
+    // The two timestamps and the three flags below them are written by the UDP listener thread
+    // and by the executor, so they are guarded by lock_. The timestamps are why a mutex rather
+    // than atomics: rclcpp::Time is 16 bytes and a torn read yields a nonsense age. The three
+    // t_*_ doubles between them are NOT guarded and do not need to be -- init_udp() writes them
+    // once, before start_udp_listener() exists to read them. Making any of them runtime-tunable
+    // would change that.
     rclcpp::Time t_last_packet_ = this->get_clock()->now();      // any packet, heartbeat included
     rclcpp::Time t_last_car_packet_ = this->get_clock()->now();  // packets carrying vehicle data
     double t_Udp_maxAge_;     // Max age of UDP packets to accept
@@ -83,7 +86,7 @@ private:
     bool no_car_data_ = false;
     bool notified_timeout_silence_ = false;
 
-    int sockfd_ = socket(AF_INET,SOCK_DGRAM,0);
+    int sockfd_ = -1;  // Opened in init_udp(); an NSDMI socket() here leaked one fd per node.
     int m_serialPort_ = 0;
 
     std::mutex lock_;
@@ -104,8 +107,17 @@ private:
     bool parseChar(unsigned char x);
     uint8_t calc_crc8(const char* data, size_t len);
 
+    // Where a packet came in, because only one of the two says anything about our own hardware.
+    // UDP arrives from the transponder box; the serial dongle is a radio tap wired straight to
+    // this host, so its frames prove another car is transmitting and nothing more.
+    enum class PacketSource
+    {
+        kTransponderUdp,
+        kSerialRadioTap,
+    };
+
     void callback_Transponder(const transponder_msgs::msg::Transponder::SharedPtr msg);
-    void publish_Transponder(TransponderUdpPacket transponder);
+    void publish_Transponder(TransponderUdpPacket transponder, PacketSource source);
     void publish_link_status();
 
     void callback_1Hz();

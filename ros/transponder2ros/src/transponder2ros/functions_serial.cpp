@@ -154,10 +154,10 @@ void transponder2ros::read_serialData()
             }
         }
         
-        // Deliberately does not touch t_last_packet_. This dongle is a direct radio tap that
-        // bypasses the transponder box, so bytes here prove another car is transmitting, not that
-        // our own unit is reachable -- which is the whole claim the published link status makes.
-        // A frame that passes the CRC reaches publish_Transponder anyway, and refreshes it there.
+        // Frames from here are tagged kSerialRadioTap, so they publish car data but never move
+        // the link clock. This dongle is wired straight to the host and bypasses the transponder
+        // box, so it proves another car is transmitting, not that our own unit is reachable --
+        // which is the whole claim the published link status makes.
         for (int ii = 0; ii < n_read; ii++)
         {
             parseChar(buf[ii]);
@@ -224,7 +224,7 @@ bool transponder2ros::parseChar(unsigned char x)
         {
             // Checksum passed, assemble and publish message
             // RCLCPP_INFO(this->get_logger(), "Checksum passed");
-            publish_Transponder(data);
+            publish_Transponder(data, PacketSource::kSerialRadioTap);
         }
         else
         {
