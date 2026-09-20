@@ -24,7 +24,8 @@ def generate_launch_description():
             {'transponder_ip': '10.42.17.210'},  # IP address of the transponder
             {'udp_port': 15783},              # UDP port to communicate on (match transponder)
             {'max_age':  1.0},                # Max age of packets, otherwise reject [ s ]
-            {'timeout': 10.0},                # Time before notifying of no packets [ s ]
+            {'timeout': 10.0},                # Time before notifying of no car data [ s ]
+            {'link_timeout': 3.0},            # Silence from the unit before the link is lost [ s ]
             # Serial network (direct xbee connection for debugging)
             {'device_id': ''},                # Device ID of the XBee (leave blank to disable)
         ],

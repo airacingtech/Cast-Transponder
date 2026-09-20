@@ -1,1 +1,10 @@
 .vscode/
+
+# Bytecode from the ROS launch files, regenerated on every launch.
+__pycache__/
+*.py[cod]
+
+# colcon build artifacts, when the ros/ workspace is built in place.
+build/
+install/
+log/
