@@ -154,12 +154,14 @@ void transponder2ros::read_serialData()
             }
         }
         
+        // Deliberately does not touch t_last_packet_. This dongle is a direct radio tap that
+        // bypasses the transponder box, so bytes here prove another car is transmitting, not that
+        // our own unit is reachable -- which is the whole claim the published link status makes.
+        // A frame that passes the CRC reaches publish_Transponder anyway, and refreshes it there.
         for (int ii = 0; ii < n_read; ii++)
         {
             parseChar(buf[ii]);
         }
-
-        t_last_packet_ = this->get_clock()->now();
     }
 
     // Done
