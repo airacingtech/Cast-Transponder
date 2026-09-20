@@ -55,14 +55,20 @@ private:
     sockaddr_in send_addr_;
 
     char buffer_[1024];
-    struct sockaddr_in client_addr_;
-    socklen_t addr_len_ = sizeof(client_addr_);
-    int read_addr_; //socket_fd;
+    // Sender of the datagram recvfrom just returned. Must be a sockaddr_in, not an int: recvfrom
+    // writes addr_len_ bytes here, so a 4-byte member let the kernel scribble 12 bytes over
+    // whatever followed it -- which was t_last_packet_, whose clock type it zeroed.
+    struct sockaddr_in read_addr_{};
+    socklen_t addr_len_ = sizeof(read_addr_);
 
     // Two independent silences, deliberately not one flag. A heartbeat proves the unit is
     // reachable but says nothing about the radio, so "the unit is gone" and "no car is
     // broadcasting" are different faults with different deadlines and different audiences --
     // link_lost_ gates the published link status, no_car_data_ only drives an operator warning.
+    //
+    // Everything from here to notified_timeout_silence_ is written by the UDP listener thread and
+    // by the executor, so it is guarded by lock_. The timestamps are the reason a mutex is needed
+    // rather than atomics: rclcpp::Time is 16 bytes and a torn read yields a nonsense age.
     rclcpp::Time t_last_packet_ = this->get_clock()->now();      // any packet, heartbeat included
     rclcpp::Time t_last_car_packet_ = this->get_clock()->now();  // packets carrying vehicle data
     double t_Udp_maxAge_;     // Max age of UDP packets to accept
@@ -88,6 +94,7 @@ private:
     void init_udp();
     void init_ros();
     void init_serial();
+    void start_udp_listener();
 
     void push_udp(StructIacTransponder data);
     void read_udpData();

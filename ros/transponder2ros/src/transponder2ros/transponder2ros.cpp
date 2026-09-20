@@ -15,6 +15,9 @@ transponder2ros::transponder2ros()
     // Init ROS
     init_ros();
 
+    // Last: the listener publishes, so every publisher it touches has to exist first.
+    start_udp_listener();
+
     // All done
     return;
 }
@@ -25,8 +28,10 @@ transponder2ros::~transponder2ros()
     {
         receive_data_thread_.join();
     }
-    if (read_addr_ != -1)
+    // The socket, not read_addr_ -- that holds the last sender's address and closing it amounted
+    // to closing whatever descriptor number the peer's IP bytes happened to spell.
+    if (sockfd_ != -1)
     {
-        close(read_addr_);
+        close(sockfd_);
     }
 }

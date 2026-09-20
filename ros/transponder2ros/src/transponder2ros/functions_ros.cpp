@@ -16,7 +16,11 @@ void transponder2ros::init_ros()
     // Publishers
     pub_Transponder_ = this->create_publisher<transponder_msgs::msg::Transponder>(param_transponderIn, 1);
     pub_Version_ = this->create_publisher<std_msgs::msg::String>(param_versionOut, 10);
-    pub_LinkStatus_ = this->create_publisher<std_msgs::msg::Bool>(param_linkStatusOut, 10);
+    // Latched: this is a state, not an event, and the consumer gates the rival feed on it with no
+    // other way to learn the value. A subscriber that comes up after us would otherwise sit on its
+    // own default -- link down, feed suppressed -- until the next 1 Hz tick.
+    pub_LinkStatus_ = this->create_publisher<std_msgs::msg::Bool>(
+        param_linkStatusOut, rclcpp::QoS(1).transient_local());
 
     // Subscribers
     sub_Transponder_ = this->create_subscription<transponder_msgs::msg::Transponder>(
@@ -50,12 +54,17 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
     // Any packet, heartbeat included, proves the local Ethernet link, the transponder unit and its
     // firmware loop are alive even when nothing has been heard over the XBee radio -- that's what
     // distinguishes "no vehicle detected" from "we can't detect the transponder at all."
-    t_last_packet_ = this->get_clock()->now();
-    packet_ever_received_ = true;
-    if (link_lost_)
+    bool announce_connected = false;
+    {
+        std::lock_guard<std::mutex> guard(lock_);
+        t_last_packet_ = this->get_clock()->now();
+        packet_ever_received_ = true;
+        announce_connected = link_lost_;
+        link_lost_ = false;
+    }
+    if (announce_connected)
     {
         RCLCPP_INFO(this->get_logger(), "Transponder connected");
-        link_lost_ = false;
         publish_link_status();
     }
 
@@ -82,9 +91,12 @@ void transponder2ros::publish_Transponder(TransponderUdpPacket transponder)
     // age check rather than beside the link timestamp above: a rival whose stamps are unusable
     // keeps arriving but publishes nothing, and counting it as data would silence the one warning
     // that reports the rival feed being down.
-    t_last_car_packet_ = this->get_clock()->now();
-    no_car_data_ = false;
-    notified_timeout_silence_ = false;
+    {
+        std::lock_guard<std::mutex> guard(lock_);
+        t_last_car_packet_ = this->get_clock()->now();
+        no_car_data_ = false;
+        notified_timeout_silence_ = false;
+    }
 
     // Publish the data
     transponder_msgs::msg::Transponder msg;
@@ -142,7 +154,10 @@ void transponder2ros::callback_Transponder(const transponder_msgs::msg::Transpon
 void transponder2ros::publish_link_status()
 {
     std_msgs::msg::Bool msg;
-    msg.data = !link_lost_;
+    {
+        std::lock_guard<std::mutex> guard(lock_);
+        msg.data = !link_lost_;
+    }
     pub_LinkStatus_->publish(msg);
 }
 
@@ -150,33 +165,45 @@ void transponder2ros::callback_1Hz()
 {
 
     const rclcpp::Time t_now = this->get_clock()->now();
-    rclcpp::Duration t_since_last_packet = t_now - t_last_packet_;
-    rclcpp::Duration t_since_last_car = t_now - t_last_car_packet_;
 
     // Assigned rather than latched, so recovery is symmetric with loss: the only other clear site
     // is publish_Transponder, and a packet path that refreshes a timestamp without reaching it
     // would otherwise leave these stuck true for the life of the node.
-    link_lost_ = !packet_ever_received_ || t_since_last_packet.seconds() > t_Link_timeout_;
-    no_car_data_ = t_since_last_car.seconds() > t_Udp_timeout_;
+    double since_last_car_s = 0.0;
+    bool warn_no_car_data = false;
+    bool announce_silence = false;
+    {
+        std::lock_guard<std::mutex> guard(lock_);
+        since_last_car_s = (t_now - t_last_car_packet_).seconds();
+        link_lost_ = !packet_ever_received_ ||
+            (t_now - t_last_packet_).seconds() > t_Link_timeout_;
+        no_car_data_ = since_last_car_s > t_Udp_timeout_;
+
+        // Nags for the first 30 s of a silence, then says so once and stops. The latch is cleared
+        // where the data returns, not here: clearing it on every tick where the silence has not
+        // yet reached its timeout would re-arm the message and print it once a second forever.
+        if (no_car_data_)
+        {
+            warn_no_car_data = since_last_car_s < 30.0;
+            announce_silence = !warn_no_car_data && !notified_timeout_silence_;
+            if (announce_silence)
+            {
+                notified_timeout_silence_ = true;
+            }
+        }
+    }
 
     publish_link_status();
 
-    // Nags for the first 30 s of a silence, then says so once and stops. The latch is cleared
-    // where the data returns, not here: clearing it on every tick where the silence has not yet
-    // reached its timeout would re-arm the message and print it once a second forever.
-    if (no_car_data_)
+    if (warn_no_car_data)
     {
-        if (t_since_last_car.seconds() < 30.0)
-        {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5UL * 1000 * 1000,
-                "No transponder data from other cars in %.1f s", t_since_last_car.seconds()
-            );
-        }
-        else if (!notified_timeout_silence_)
-        {
-            RCLCPP_INFO(this->get_logger(), ">> Silencing transponder timeout message");
-            notified_timeout_silence_ = true;
-        }
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5UL * 1000 * 1000,
+            "No transponder data from other cars in %.1f s", since_last_car_s
+        );
+    }
+    else if (announce_silence)
+    {
+        RCLCPP_INFO(this->get_logger(), ">> Silencing transponder timeout message");
     }
 
     // All done

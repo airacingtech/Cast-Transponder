@@ -55,11 +55,17 @@ void transponder2ros::init_udp()
     send_addr_.sin_addr.s_addr = inet_addr(param_ip_address.c_str());
     send_addr_.sin_port = htons(param_port);  // Use the same port for sending
 
-    // UDP socket listener thread
-    receive_data_thread_ = std::thread(&transponder2ros::read_udpData, this);
+    // The listener thread is NOT started here. It calls publish_Transponder, which publishes on
+    // handles init_ros() has not created yet, so starting it before the node is fully built races
+    // a null publisher against the first arriving packet. start_udp_listener() does it last.
 
     // All done
     return;
+}
+
+void transponder2ros::start_udp_listener()
+{
+    receive_data_thread_ = std::thread(&transponder2ros::read_udpData, this);
 }
 
 void transponder2ros::push_udp(StructIacTransponder data)

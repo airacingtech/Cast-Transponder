@@ -235,9 +235,12 @@ void send_heartbeat_udp()
 {
   TransponderUdpPacket heartbeat;
 
+  // Every data field is zero, the timestamp included: this device has no clock of its own, and
+  // last_udp_sec_ is the ego car's last outbound stamp -- borrowing it would put a plausible but
+  // unrelated time on a packet that carries no observation. The ROS side reads arrival time.
   heartbeat.data.version = TRANSPONDER_UDP_STRUCT_VERISON;
-  heartbeat.data.sec = last_udp_sec_;
-  heartbeat.data.nanosec = last_udp_nanosec_;
+  heartbeat.data.sec = 0;
+  heartbeat.data.nanosec = 0;
   heartbeat.data.car_id = HEARTBEAT_CAR_ID;
   heartbeat.data.lat = 0;
   heartbeat.data.lon = 0;
