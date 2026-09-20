@@ -59,10 +59,19 @@ private:
     socklen_t addr_len_ = sizeof(client_addr_);
     int read_addr_; //socket_fd;
 
-    rclcpp::Time t_last_packet_ = this->get_clock()->now();
-    double t_Udp_maxAge_;   // Max age of UDP packets to accept
-    double t_Udp_timeout_;  // Timeout before warning user of no packets
-    bool has_timeout_ = false;
+    // Two independent silences, deliberately not one flag. A heartbeat proves the unit is
+    // reachable but says nothing about the radio, so "the unit is gone" and "no car is
+    // broadcasting" are different faults with different deadlines and different audiences --
+    // link_lost_ gates the published link status, no_car_data_ only drives an operator warning.
+    rclcpp::Time t_last_packet_ = this->get_clock()->now();      // any packet, heartbeat included
+    rclcpp::Time t_last_car_packet_ = this->get_clock()->now();  // packets carrying vehicle data
+    double t_Udp_maxAge_;     // Max age of UDP packets to accept
+    double t_Udp_timeout_;    // Timeout before warning user of no data from other cars
+    double t_Link_timeout_;   // Silence from the unit itself before the link counts as lost
+    // Starts lost: nothing has been heard yet, and a consumer gates the rival feed on this, so
+    // claiming a working link before the first packet is the one answer that is never safe.
+    bool link_lost_ = true;
+    bool no_car_data_ = false;
 
     int sockfd_ = socket(AF_INET,SOCK_DGRAM,0);
     int m_serialPort_ = 0;

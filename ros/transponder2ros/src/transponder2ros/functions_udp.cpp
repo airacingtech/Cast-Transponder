@@ -6,13 +6,15 @@ void transponder2ros::init_udp()
     // Get the param
     this->declare_parameter("transponder_ip", "127.0.0.1");
     this->declare_parameter<int>("udp_port", 15783);
-    this->declare_parameter<double>("timeout", 10.0);       // Timeout for alerting user of no packets
+    this->declare_parameter<double>("timeout", 10.0);       // Timeout for alerting user of no car data
+    this->declare_parameter<double>("link_timeout", 3.0);   // Silence from the unit before the link is lost
     this->declare_parameter<double>("max_age",  1.0);       // Max age of accepted packets
 
     std::string param_ip_address = this->get_parameter("transponder_ip").as_string();
     uint16_t param_port = this->get_parameter("udp_port").as_int();
     
     t_Udp_timeout_ = this->get_parameter("timeout").as_double();
+    t_Link_timeout_ = this->get_parameter("link_timeout").as_double();
     t_Udp_maxAge_ = this->get_parameter("max_age").as_double();
 
     RCLCPP_INFO(this->get_logger(), "\tTransponder link at %s:%d",param_ip_address.c_str(), param_port);
