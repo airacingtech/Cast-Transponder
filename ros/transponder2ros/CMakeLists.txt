@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.20)
 project(transponder2ros)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -50,10 +50,10 @@ add_executable(transponder2ros_node src/transponder2ros_node.cpp
     src/transponder2ros/functions_udp.cpp
     src/transponder2ros/transponder2ros.cpp
     )
-    ament_target_dependencies(transponder2ros_node 
-        rclcpp
-        std_msgs
-        transponder_msgs
+    target_link_libraries(transponder2ros_node
+        ${rclcpp_TARGETS}
+        ${std_msgs_TARGETS}
+        ${transponder_msgs_TARGETS}
     )
     install(TARGETS
       transponder2ros_node
@@ -63,11 +63,11 @@ add_executable(transponder2ros_node src/transponder2ros_node.cpp
 add_executable(transponder2NavSatFix_node src/transponder2NavSatFix_node.cpp
     src/transponder2NavSatFix_node.cpp
     )
-    ament_target_dependencies(transponder2NavSatFix_node 
-        rclcpp
-        std_msgs
-        sensor_msgs
-        transponder_msgs
+    target_link_libraries(transponder2NavSatFix_node
+        ${rclcpp_TARGETS}
+        ${std_msgs_TARGETS}
+        ${sensor_msgs_TARGETS}
+        ${transponder_msgs_TARGETS}
     )
     install(TARGETS
         transponder2NavSatFix_node
@@ -75,10 +75,10 @@ add_executable(transponder2NavSatFix_node src/transponder2NavSatFix_node.cpp
     )
 
 add_executable(debug_node src/debug_node.cpp)
-    ament_target_dependencies(debug_node 
-        rclcpp
-        std_msgs
-        transponder_msgs
+    target_link_libraries(debug_node
+        ${rclcpp_TARGETS}
+        ${std_msgs_TARGETS}
+        ${transponder_msgs_TARGETS}
     )
     install(TARGETS
       debug_node
@@ -86,15 +86,17 @@ add_executable(debug_node src/debug_node.cpp)
     )
 
 add_executable(odom2transponder_node src/odom2transponder_node.cpp)
-    ament_target_dependencies(odom2transponder_node 
-        rclcpp
-        std_msgs
-        nav_msgs
-        geographic_msgs
-        transponder_msgs
-        geometry_msgs
-        GeographicLib
+    # GeographicLib's Debian find module exports no CMake target, only libraries and include dirs.
+    target_link_libraries(odom2transponder_node
+        ${rclcpp_TARGETS}
+        ${std_msgs_TARGETS}
+        ${nav_msgs_TARGETS}
+        ${geographic_msgs_TARGETS}
+        ${transponder_msgs_TARGETS}
+        ${geometry_msgs_TARGETS}
+        ${GeographicLib_LIBRARIES}
     )
+    target_include_directories(odom2transponder_node PRIVATE ${GeographicLib_INCLUDE_DIRS})
     install(TARGETS
     odom2transponder_node
         DESTINATION lib/${PROJECT_NAME}
